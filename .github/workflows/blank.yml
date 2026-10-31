@@ -26,10 +26,32 @@ jobs:
       - name: Instalar SDK Android 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Descomprimir proyecto TONY
+      - name: Buscar y extraer proyecto
+        id: extract
         run: |
-          unzip -q "Proyecto TONY_Android.zip" -d extracted
-          ls -la extracted/TONY_Android_Project
+          ZIP=$(find . -type f -iname "*.zip" -print -quit)
+
+          if [ -z "$ZIP" ]; then
+            echo "No se encontró ningún archivo ZIP."
+            find . -maxdepth 4 -type f
+            exit 1
+          fi
+
+          echo "ZIP encontrado: $ZIP"
+          mkdir -p extracted
+          unzip -q "$ZIP" -d extracted
+
+          SETTINGS=$(find extracted -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) -print -quit)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "No se encontró settings.gradle."
+            find extracted -maxdepth 5 -type f
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo "Proyecto encontrado en: $PROJECT_DIR"
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -37,11 +59,11 @@ jobs:
           gradle-version: "8.9"
 
       - name: Compilar APK
-        run: gradle -p extracted/TONY_Android_Project assembleDebug
+        run: gradle -p "${{ steps.extract.outputs.project_dir }}" assembleDebug
 
       - name: Guardar APK
         uses: actions/upload-artifact@v4
         with:
           name: TONY-debug-apk
-          path: extracted/TONY_Android_Project/app/build/outputs/apk/debug/app-debug.apk
+          path: extracted/**/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
