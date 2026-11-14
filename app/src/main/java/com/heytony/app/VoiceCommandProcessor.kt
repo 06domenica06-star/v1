@@ -1,6 +1,5 @@
 package com.heytony.app
 
-import android.app.AlarmClock
 import android.app.KeyguardManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -11,6 +10,7 @@ import android.media.AudioManager
 import android.media.AudioManager.*
 import android.net.Uri
 import android.provider.MediaStore
+import android.provider.AlarmClock
 import android.provider.Settings
 import android.view.KeyEvent
 import android.os.BatteryManager
