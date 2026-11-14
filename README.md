@@ -1,36 +1,39 @@
-# HEY TONY — proyecto Android inicial
+# HEY TONY — asistente Android de voz
 
-Aplicación nativa Android en Kotlin y Jetpack Compose. Permite iniciar el reconocimiento de voz tocando el botón, interpretar un conjunto inicial de comandos, abrir algunas aplicaciones y responder mediante la voz del sistema.
+Proyecto nativo en Kotlin y Jetpack Compose. Al abrir HEY TONY se solicita el permiso de micrófono y se inicia un servicio de Android en primer plano. La notificación permanente indica que el micrófono está activo y permite detenerlo. El servicio puede continuar cuando la app queda en segundo plano o se quita de Recientes, sujeto a las restricciones del teléfono.
 
 ## Requisitos
 
 - Android Studio reciente
 - JDK 17
 - Android SDK 35
-- Teléfono Android 8.0 (API 26) o posterior para instalar
+- Android 8.0 (API 26) o posterior
 
-Abre esta carpeta en Android Studio, espera la sincronización de Gradle y ejecuta la configuración `app` en un teléfono. Al tocar **Hablar con Tony**, acepta el permiso de micrófono y habla en español.
+Abre la carpeta en Android Studio o compílala con el flujo de GitHub Actions incluido. Al instalarla, concede el permiso de micrófono y, en Android 13 o posterior, permite las notificaciones para ver el control persistente.
 
-## Comandos implementados
+## Comandos de voz incluidos
 
-- Abrir Spotify, YouTube, WhatsApp, Instagram o Chrome (si están instalados)
-- Abrir Ajustes o Cámara
-- Consultar hora, fecha y nivel de batería
-- Subir o bajar volumen multimedia
+- Abrir Spotify, YouTube, WhatsApp, Instagram, Chrome, Gmail, Google Maps, TikTok, Telegram y Facebook, si están instalados
+- Decir la hora, fecha y nivel de batería
+- Subir, bajar, silenciar o activar el volumen multimedia
+- Pausar o reanudar música, pasar a la siguiente canción o volver a la anterior
+- Abrir la cámara, ajustes, contactos, mensajes y controles de Wi-Fi
+- Encender o apagar la linterna (requiere permiso de cámara)
+- Programar una alarma o temporizador
+- Buscar en internet y abrir mapas de lugares
+- Abrir el marcador con un número dictado; la llamada se confirma en pantalla
+- Preguntar “¿qué puedes hacer?” para oír ejemplos
 
-Los demás comandos muestran una respuesta orientativa y no ejecutan todavía llamadas, control multimedia o linterna.
+## Límites de Android
 
-## Alcance y límites
+La escucha se mantiene mediante un servicio con notificación visible. Se inicia cuando abres la app y das permiso; puede seguir en segundo plano, pero Android y las optimizaciones de batería de cada fabricante pueden detenerla. No se garantiza que sobreviva a **Forzar detención**, reinicios del teléfono o todas las políticas de Samsung, Xiaomi y otros fabricantes.
 
-Esta versión no incluye detección de “Hey Tony” en segundo plano, pantalla bloqueada ni micrófono permanente. Android reserva la detección DSP y la integración completa de asistentes para servicios y hardware compatibles; una app normal no puede garantizar esa función en todos los teléfonos. La escucha actual comienza únicamente tras tocar el botón y usa el servicio de reconocimiento que provea el dispositivo, que puede requerir conexión a Internet. Las respuestas habladas usan TextToSpeech del sistema. No se guardan grabaciones.
+Esta versión no tiene un detector de palabra clave “Hey Tony”: mientras el servicio está activo, el reconocedor del teléfono escucha frases y procesa los comandos que entiende. El reconocimiento puede necesitar internet y consume más batería que un detector de palabra clave de bajo consumo. Android también puede bloquear la apertura de otras aplicaciones desde segundo plano o con la pantalla bloqueada; las consultas habladas y acciones de sistema compatibles sí pueden responder sin mostrar una pantalla. No se envían grabaciones a un servidor propio ni se guardan audios.
 
-No se pudo generar un APK en este entorno porque no hay Android SDK ni Gradle instalados. El proyecto se puede abrir y compilar desde Android Studio con los requisitos anteriores.
+## Obtener el APK con GitHub Actions
 
-## Compilar el APK con GitHub Actions
+1. Sube el contenido del proyecto a la raíz del repositorio, incluida la carpeta `.github`.
+2. El flujo **Build Android APK** se ejecuta al subir cambios a `main` o `master`; también puedes iniciarlo desde **Actions → Build Android APK → Run workflow**.
+3. Descarga el artefacto **HEY_TONY-debug-APK** de una ejecución completada. Incluye `app-debug.apk`.
 
-1. Crea un repositorio en GitHub.
-2. Descomprime el ZIP y sube todo el contenido de esta carpeta a la raíz del repositorio (incluida la carpeta oculta `.github`).
-3. Al subir los archivos a `main` o `master`, GitHub ejecutará **Build Android APK**. También puedes iniciarlo desde **Actions → Build Android APK → Run workflow**.
-4. Cuando termine, abre la ejecución y descarga el artefacto **HEY_TONY-debug-APK**. Dentro encontrarás `app-debug.apk`.
-
-El APK es de depuración para instalar y probar; no es un paquete firmado para publicar en Google Play.
+El APK es una compilación de depuración para instalar y probar, no un paquete firmado para Google Play.
