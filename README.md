@@ -1,4 +1,4 @@
-# HEY TONY — asistente Android de voz
+# HEY TONY — asistente Android de voz (v1.3)
 
 Proyecto nativo en Kotlin y Jetpack Compose. Al abrir HEY TONY se solicita el permiso de micrófono y se inicia un servicio de Android en primer plano. La notificación permanente indica que el micrófono está activo y permite detenerlo. El servicio puede continuar cuando la app queda en segundo plano o se quita de Recientes, sujeto a las restricciones del teléfono.
 
@@ -12,6 +12,19 @@ Proyecto nativo en Kotlin y Jetpack Compose. Al abrir HEY TONY se solicita el pe
 Abre la carpeta en Android Studio o compílala con el flujo de GitHub Actions incluido. Al instalarla, concede el permiso de micrófono y, en Android 13 o posterior, permite las notificaciones para ver el control persistente.
 
 ## Comandos de voz incluidos
+
+Prueba frases como estas mientras el indicador diga que Tony está escuchando:
+
+- “Abre WhatsApp”, “abre Spotify” o “abre Google Maps”
+- “¿Qué hora es?”, “¿qué fecha es hoy?” o “¿cuánta batería tengo?”
+- “Sube el volumen”, “pausa la música” o “siguiente canción”
+- “Enciende la linterna” o “abre los ajustes”
+- “Pon una alarma para las 7” o “temporizador de 5 minutos”
+- “Busca restaurantes en Lima” o “cómo llego a Machu Picchu”
+- “Abre contactos”, “abre mensajes” o “llama al 999123456”
+- “¿Qué puedes hacer?”
+
+No hace falta decir “Hey Tony”. Esta versión escucha comandos continuamente mientras el servicio está activo; el micrófono se muestra mediante una notificación permanente. No incorpora una detección local de palabra de activación.
 
 - Abrir Spotify, YouTube, WhatsApp, Instagram, Chrome, Gmail, Google Maps, TikTok, Telegram y Facebook, si están instalados
 - Decir la hora, fecha y nivel de batería

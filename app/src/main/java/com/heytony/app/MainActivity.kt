@@ -11,8 +11,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -101,13 +101,13 @@ private fun HeyTonyScreen(activity: MainActivity) {
     }
 
     MaterialTheme(colorScheme = darkColorScheme(primary = Blue, background = Navy, surface = Color(0xFF10233B))) {
-        Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF08162A), Color(0xFF0B2341), Navy))).padding(horizontal = 22.dp)) {
+        Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF08162A), Color(0xFF0B2341), Navy))).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.SettingsVoice, null, tint = Blue, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(10.dp))
                 Text("HEY TONY", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                 Spacer(Modifier.weight(1f))
-                Text("v1.2", color = Color(0xFF9BB5D1), fontSize = 13.sp)
+                Text("v1.3", color = Color(0xFF9BB5D1), fontSize = 13.sp)
             }
             Spacer(Modifier.height(30.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF10233B)), shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth()) {
@@ -149,9 +149,21 @@ private fun HeyTonyScreen(activity: MainActivity) {
                 }
             }
             Spacer(Modifier.height(20.dp))
-            Text("COMANDOS DE VOZ", color = Pale, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+            Text("PRUEBA ESTOS COMANDOS", color = Pale, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
             Spacer(Modifier.height(8.dp))
-            Text("Abre apps · hora, fecha y batería · volumen y música · alarmas y temporizadores · linterna · búsquedas y mapas", color = Color(0xFFB6C9DF), fontSize = 14.sp, lineHeight = 21.sp)
+            Text(
+                "• Abre WhatsApp, Spotify, YouTube o Google Maps\n" +
+                    "• ¿Qué hora es? · ¿Qué fecha es hoy? · ¿Cuánta batería tengo?\n" +
+                    "• Sube el volumen · pausa la música · siguiente canción\n" +
+                    "• Enciende la linterna · abre la cámara o los ajustes\n" +
+                    "• Pon una alarma para las 7 · temporizador de 5 minutos\n" +
+                    "• Busca restaurantes en Lima · cómo llego a Machu Picchu\n" +
+                    "• Abre contactos · abre mensajes · llama al 999123456\n" +
+                    "• Di “qué puedes hacer” para escuchar la lista de funciones",
+                color = Color(0xFFB6C9DF), fontSize = 14.sp, lineHeight = 22.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("No necesitas decir “Hey Tony”: habla cuando el indicador diga que está escuchando. La notificación confirma que el micrófono sigue activo.", color = Color(0xFF8EA8C5), fontSize = 12.sp, lineHeight = 18.sp)
             Spacer(Modifier.height(18.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("HISTORIAL", color = Pale, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
@@ -159,8 +171,8 @@ private fun HeyTonyScreen(activity: MainActivity) {
             }
             Spacer(Modifier.height(7.dp))
             if (history.isEmpty()) Text("Tus comandos recientes aparecerán aquí.", color = Color(0xFF7892AF), fontSize = 13.sp)
-            else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(history.take(5)) { item ->
+            else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                history.take(5).forEach { item ->
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF10233B)), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text("Tú: ${item.heard}", color = Color.White, fontSize = 13.sp)
@@ -169,8 +181,8 @@ private fun HeyTonyScreen(activity: MainActivity) {
                     }
                 }
             }
-            Spacer(Modifier.weight(1f))
-            Text("Tony escucha los comandos mientras está activo. Usa la notificación o el botón para detenerlo.", color = Color(0xFF67819D), fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("Tony escucha comandos mientras el servicio está activo. Usa la notificación o el botón para detenerlo.", color = Color(0xFF67819D), fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp))
         }
     }
 }

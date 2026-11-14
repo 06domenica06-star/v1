@@ -57,7 +57,7 @@ object VoiceCommandProcessor {
             return "La batería está al $level por ciento."
         }
         if (command.contains("qué puedes hacer") || command.contains("que puedes hacer") || command.contains("ayuda")) {
-            return "Puedo abrir aplicaciones, decirte la hora, fecha y batería, controlar el volumen y la música, poner alarmas y temporizadores, buscar en internet y abrir mapas."
+            return "Puedo abrir aplicaciones, decirte la hora, fecha y batería, controlar el volumen y la música, encender la linterna, abrir cámara, ajustes, contactos y mensajes, poner alarmas y temporizadores, buscar en internet y abrir mapas."
         }
         if (command.contains("cómo te llamas") || command.contains("como te llamas") || command.contains("quién eres") || command.contains("quien eres")) {
             return "Soy Tony, tu asistente de voz."
