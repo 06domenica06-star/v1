@@ -2,22 +2,25 @@ package com.heytony.app
 
 import android.Manifest
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.os.BatteryManager
-import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
+import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -51,8 +54,14 @@ data class LogEntry(val heard: String, val reply: String)
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var onRecognized: ((String) -> Unit)? = null
-    private var onError: ((String) -> Unit)? = null
+    private var recognizer: SpeechRecognizer? = null
+    private var autoListening = false
+    private var activityVisible = false
+    private var onListeningChanged: ((Boolean) -> Unit)? = null
+    private var onStatusChanged: ((String) -> Unit)? = null
+    private var onCommandHeard: ((String) -> Unit)? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val restartRecognizer = Runnable { beginRecognition() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,40 +69,146 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         setContent { HeyTonyScreen(this) }
     }
 
-    override fun onInit(status: Int) {
-        ttsReady = status == TextToSpeech.SUCCESS
-        if (ttsReady) tts?.language = Locale("es", "MX")
+    override fun onStart() {
+        super.onStart()
+        activityVisible = true
+        if (autoListening) beginRecognition()
     }
 
-    fun listen(onResult: (String) -> Unit, onFailure: (String) -> Unit) {
-        onRecognized = onResult
-        onError = onFailure
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            onFailure("Este teléfono no tiene un servicio de reconocimiento de voz disponible.")
+    override fun onStop() {
+        activityVisible = false
+        mainHandler.removeCallbacks(restartRecognizer)
+        recognizer?.cancel()
+        onListeningChanged?.invoke(false)
+        super.onStop()
+    }
+
+    override fun onInit(status: Int) {
+        ttsReady = status == TextToSpeech.SUCCESS
+        if (ttsReady) {
+            tts?.language = Locale("es", "MX")
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) = Unit
+                override fun onDone(utteranceId: String?) {
+                    mainHandler.post { scheduleRecognition(350) }
+                }
+                @Deprecated("Deprecated by Android")
+                override fun onError(utteranceId: String?) {
+                    mainHandler.post { scheduleRecognition(350) }
+                }
+            })
+        }
+    }
+
+    fun startAutomaticListening(
+        onListening: (Boolean) -> Unit,
+        onStatus: (String) -> Unit,
+        onCommand: (String) -> Unit
+    ) {
+        onListeningChanged = onListening
+        onStatusChanged = onStatus
+        onCommandHeard = onCommand
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            onStatus("Permite el micrófono para que Tony empiece a escuchar al abrir la app.")
             return
         }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            onStatus("Este teléfono no tiene un servicio de reconocimiento de voz disponible.")
+            return
+        }
+        autoListening = true
+        onStatus("Escucha automática activa mientras HEY TONY está abierta.")
+        createRecognizerIfNeeded()
+        beginRecognition()
+    }
+
+    fun stopAutomaticListening() {
+        autoListening = false
+        mainHandler.removeCallbacks(restartRecognizer)
+        recognizer?.cancel()
+        onListeningChanged?.invoke(false)
+        onStatusChanged?.invoke("Escucha pausada.")
+    }
+
+    fun resumeAutomaticListening() {
+        if (onCommandHeard == null) return
+        autoListening = true
+        onStatusChanged?.invoke("Escucha automática activa mientras HEY TONY está abierta.")
+        beginRecognition()
+    }
+
+    private fun createRecognizerIfNeeded() {
+        if (recognizer != null) return
+        recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    onListeningChanged?.invoke(true)
+                    onStatusChanged?.invoke("Te escucho; di tu comando.")
+                }
+                override fun onBeginningOfSpeech() { onListeningChanged?.invoke(true) }
+                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+                override fun onEndOfSpeech() {
+                    onListeningChanged?.invoke(false)
+                    onStatusChanged?.invoke("Entendiendo…")
+                }
+                override fun onError(error: Int) {
+                    onListeningChanged?.invoke(false)
+                    if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                        autoListening = false
+                        onStatusChanged?.invoke("Activa el permiso de micrófono en los ajustes de Android.")
+                    } else {
+                        onStatusChanged?.invoke("No te escuché; sigo intentando.")
+                        scheduleRecognition(700)
+                    }
+                }
+                override fun onResults(results: Bundle?) {
+                    val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    onListeningChanged?.invoke(false)
+                    if (heard.isNullOrBlank()) {
+                        scheduleRecognition(500)
+                    } else {
+                        onCommandHeard?.invoke(heard)
+                    }
+                }
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            })
+        }
+    }
+
+    private fun beginRecognition() {
+        if (!autoListening || !activityVisible || isFinishing || isDestroyed) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+        createRecognizerIfNeeded()
+        mainHandler.removeCallbacks(restartRecognizer)
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-PE")
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-PE")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Di un comando para HEY TONY")
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L)
         }
-        try { startActivityForResult(intent, 4201) }
-        catch (_: ActivityNotFoundException) { onFailure("No se encontró una aplicación de reconocimiento de voz.") }
+        try {
+            recognizer?.startListening(intent)
+        } catch (_: RuntimeException) {
+            scheduleRecognition(1000)
+        }
     }
 
-    @Deprecated("Uses the system speech UI for broad device compatibility")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != 4201) return
-        val phrase = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        if (resultCode == RESULT_OK && !phrase.isNullOrBlank()) onRecognized?.invoke(phrase)
-        else onError?.invoke("No logré entender el comando. Inténtalo otra vez.")
+    private fun scheduleRecognition(delayMillis: Long) {
+        mainHandler.removeCallbacks(restartRecognizer)
+        mainHandler.postDelayed(restartRecognizer, delayMillis)
     }
 
     fun speak(text: String) {
-        if (ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hey-tony-reply")
+        if (ttsReady) {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hey-tony-reply")
+        } else {
+            scheduleRecognition(1500)
+        }
     }
 
     fun runCommand(raw: String): String {
@@ -156,6 +271,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+        autoListening = false
+        mainHandler.removeCallbacksAndMessages(null)
+        recognizer?.destroy(); recognizer = null
         tts?.stop(); tts?.shutdown(); tts = null
         super.onDestroy()
     }
@@ -164,13 +282,41 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 @Composable
 private fun HeyTonyScreen(activity: MainActivity) {
     var listening by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Listo para ayudarte") }
-    var lastHeard by remember { mutableStateOf("Toca el micrófono y di un comando") }
+    var automaticMode by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("Preparando escucha automática…") }
+    var lastHeard by remember { mutableStateOf("Abre la app y habla; no tienes que tocar el micrófono.") }
     val entries = remember { mutableStateListOf<LogEntry>() }
+    val startListening: () -> Unit = {
+        activity.startAutomaticListening(
+            onListening = { listening = it },
+            onStatus = { status = it },
+            onCommand = { heard ->
+                lastHeard = heard
+                val reply = activity.runCommand(heard)
+                entries.add(0, LogEntry(heard, reply))
+                status = reply
+                activity.speak(reply)
+            }
+        )
+        automaticMode = ContextCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startListening(activity, { listening = it }, { status = it }, { heard, reply ->
-            lastHeard = heard; entries.add(0, LogEntry(heard, reply)); status = reply; activity.speak(reply)
-        }) else status = "Necesito permiso para usar el micrófono cuando tú inicies un comando."
+        if (granted) startListening()
+        else {
+            automaticMode = false
+            status = "Permite el micrófono en los ajustes de Android para usar la escucha automática."
+        }
+    }
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startListening()
+        } else {
+            status = "Autoriza el micrófono una vez para iniciar la escucha automática."
+            permission.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
     MaterialTheme(colorScheme = darkColorScheme(primary = Blue, background = Navy, surface = Color(0xFF10233B))) {
         Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF08162A), Color(0xFF0B2341), Navy))).padding(horizontal = 22.dp)) {
@@ -196,11 +342,29 @@ private fun HeyTonyScreen(activity: MainActivity) {
                     Spacer(Modifier.height(7.dp))
                     Text(lastHeard, color = Color(0xFFAFC3DA), fontSize = 14.sp, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(18.dp))
-                    Button(onClick = { permission.launch(Manifest.permission.RECORD_AUDIO) }, enabled = !listening, colors = ButtonDefaults.buttonColors(containerColor = Blue), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                        Icon(Icons.Default.Mic, null); Spacer(Modifier.width(9.dp)); Text(if (listening) "Escuchando…" else "Hablar con Tony", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text("La escucha se inicia solo cuando tocas el botón.", color = Color(0xFF8EA8C5), fontSize = 12.sp, textAlign = TextAlign.Center)
+                    Text(
+                        if (listening) "MICRÓFONO ACTIVO" else status.uppercase(Locale("es", "PE")),
+                        color = if (listening) Color(0xFF80C7FF) else Color(0xFF8EA8C5),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = {
+                            if (automaticMode) {
+                                activity.stopAutomaticListening()
+                                listening = false
+                                automaticMode = false
+                            } else {
+                                activity.resumeAutomaticListening()
+                                automaticMode = true
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text(if (automaticMode) "Pausar escucha" else "Reanudar escucha") }
+                    Spacer(Modifier.height(4.dp))
+                    Text("Escucha automáticamente mientras esta pantalla está abierta.", color = Color(0xFF8EA8C5), fontSize = 12.sp, textAlign = TextAlign.Center)
                 }
             }
             Spacer(Modifier.height(22.dp))
@@ -225,20 +389,7 @@ private fun HeyTonyScreen(activity: MainActivity) {
                 }
             }
             Spacer(Modifier.weight(1f))
-            Text("El reconocimiento puede usar el servicio de voz instalado en tu teléfono.", color = Color(0xFF67819D), fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp))
+            Text("El reconocimiento usa el servicio de voz del teléfono. La app deja de escuchar al salir de ella.", color = Color(0xFF67819D), fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp))
         }
     }
-}
-
-private fun startListening(
-    activity: MainActivity,
-    setListening: (Boolean) -> Unit,
-    setStatus: (String) -> Unit,
-    onCommand: (String, String) -> Unit
-) {
-    setListening(true); setStatus("Te escucho…")
-    activity.listen({ heard ->
-        val reply = activity.runCommand(heard)
-        setListening(false); onCommand(heard, reply)
-    }, { error -> setListening(false); setStatus(error) })
 }
